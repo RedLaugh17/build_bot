@@ -1,4 +1,5 @@
-from flask import Flask
+import threading
+import time
 import telebot
 import sqlite3
 import logging
@@ -6,21 +7,20 @@ from datetime import datetime, timedelta
 import csv
 from io import StringIO
 import os
+from flask import Flask
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
-# === НАСТРОЙКИ ===
+# ========== НАСТРОЙКИ ==========
 TOKEN = "8540729323:AAGzJc9Lv8_Vvd-n7wghRKt10UjV8QL68U0"
 ADMIN_ID = "353053358"
 
-# === ИНИЦИАЛИЗАЦИЯ ===
+# ========== ИНИЦИАЛИЗАЦИЯ ==========
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
-
-# === ЛОГИРОВАНИЕ ===
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# === БАЗА ДАННЫХ ===
+# ========== БАЗА ДАННЫХ ==========
 def init_db():
     conn = sqlite3.connect('data.db')
     c = conn.cursor()
@@ -31,10 +31,8 @@ def init_db():
                   employee TEXT,
                   task TEXT,
                   created_at TEXT)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS employees
-                 (name TEXT PRIMARY KEY)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS objects
-                 (name TEXT PRIMARY KEY)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS employees (name TEXT PRIMARY KEY)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS objects (name TEXT PRIMARY KEY)''')
     for emp in ['Пивненко', 'Дорохин', 'Кравцов']:
         c.execute('INSERT OR IGNORE INTO employees (name) VALUES (?)', (emp,))
     for obj in ['Малайзия', 'Ростех', 'Офис', 'Чистые пруды']:
@@ -44,7 +42,7 @@ def init_db():
 
 init_db()
 
-# === ФУНКЦИИ БАЗЫ ДАННЫХ ===
+# ========== ФУНКЦИИ БАЗЫ ДАННЫХ ==========
 def get_employees():
     conn = sqlite3.connect('data.db')
     c = conn.cursor()
@@ -154,11 +152,8 @@ def get_stats_by_period(start_date, end_date):
     for record in records:
         emp = record['employee']
         obj = record['object']
-        if emp in stats:
-            if obj in stats[emp]:
-                stats[emp][obj] += 1
-            else:
-                stats[emp][obj] = 1
+        if emp in stats and obj in stats[emp]:
+            stats[emp][obj] += 1
     return stats
 
 def get_all_records():
@@ -195,7 +190,12 @@ def delete_record_by_id(record_id):
     conn.close()
     return deleted
 
-# === ФУНКЦИИ ЭКСПОРТА ===
+def filter_records_by_employees(records, selected_employees):
+    if not selected_employees or 'Все' in selected_employees:
+        return records
+    return [r for r in records if r['employee'] in selected_employees]
+
+# ========== ЭКСПОРТ В EXCEL ==========
 def generate_detailed_excel(records, start_date, end_date):
     wb = Workbook()
     ws = wb.active
@@ -264,12 +264,7 @@ def generate_summary_excel(records, start_date, end_date):
     wb.save(filename)
     return filename
 
-def filter_records_by_employees(records, selected_employees):
-    if not selected_employees or 'Все' in selected_employees:
-        return records
-    return [r for r in records if r['employee'] in selected_employees]
-
-# === ГЛАВНОЕ МЕНЮ ===
+# ========== ГЛАВНОЕ МЕНЮ ==========
 def get_main_menu():
     markup = telebot.types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
     markup.add('📋 Добавить запись', '📊 Отчёт')
@@ -280,7 +275,7 @@ def get_main_menu():
     markup.add('❌ Удалить запись')
     return markup
 
-# === ВСЕ ОБРАБОТЧИКИ ===
+# ========== ОБРАБОТЧИКИ ==========
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
     bot.reply_to(message,
@@ -532,8 +527,8 @@ def report_week(message):
 @bot.message_handler(func=lambda message: message.text == '📅 Месяц')
 def report_month(message):
     today = datetime.now()
-    week_ago = today - timedelta(days=30)
-    start_date = week_ago.strftime('%d.%m')
+    month_ago = today - timedelta(days=30)
+    start_date = month_ago.strftime('%d.%m')
     end_date = today.strftime('%d.%m')
     process_report_period(message, start_date, end_date)
 
@@ -664,20 +659,18 @@ def process_confirm_delete(message, records):
 def back_to_main(message):
     bot.reply_to(message, "Главное меню:", reply_markup=get_main_menu())
 
-import threading
-import time
-
+# ========== FLASK ==========
 @app.route('/')
 def index():
     return 'Бот работает!', 200
 
+# ========== ЗАПУСК БОТА В ПОТОКЕ ==========
 def run_bot():
-    time.sleep(2)  # Даём время на запуск Flask
+    time.sleep(2)
     bot.remove_webhook()
     print("✅ Бот запущен в отдельном потоке!")
     bot.infinity_polling()
 
-# Запускаем бота в отдельном потоке, чтобы не блокировать Flask
 thread = threading.Thread(target=run_bot)
 thread.daemon = True
 thread.start()
