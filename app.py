@@ -664,17 +664,22 @@ def process_confirm_delete(message, records):
 def back_to_main(message):
     bot.reply_to(message, "Главное меню:", reply_markup=get_main_menu())
 
+import threading
+import time
+
 @app.route('/')
 def index():
     return 'Бот работает!', 200
 
-# === ЗАПУСК БОТА ===
-if __name__ == '__main__':
+def run_bot():
+    time.sleep(2)  # Даём время на запуск Flask
     bot.remove_webhook()
-    print("✅ Бот запущен через polling!")
-    try:
-        bot.send_message(ADMIN_ID, "✅ Бот успешно запущен на Render!")
-        print("✅ Тестовое сообщение отправлено!")
-    except Exception as e:
-        print(f"❌ Ошибка при отправке тестового сообщения: {e}")
+    print("✅ Бот запущен в отдельном потоке!")
     bot.infinity_polling()
+
+# Запускаем бота в отдельном потоке, чтобы не блокировать Flask
+thread = threading.Thread(target=run_bot)
+thread.daemon = True
+thread.start()
+
+print("✅ Flask и бот запущены!")
