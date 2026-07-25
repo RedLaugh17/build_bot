@@ -1,4 +1,4 @@
-from flask import Flask, request
+from flask import Flask
 import telebot
 import sqlite3
 import logging
@@ -6,7 +6,6 @@ from datetime import datetime, timedelta
 import csv
 from io import StringIO
 import os
-import json
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
@@ -20,7 +19,6 @@ app = Flask(__name__)
 
 # === ЛОГИРОВАНИЕ ===
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
 
 # === БАЗА ДАННЫХ ===
 def init_db():
@@ -44,9 +42,7 @@ def init_db():
     conn.commit()
     conn.close()
 
-
 init_db()
-
 
 # === ФУНКЦИИ БАЗЫ ДАННЫХ ===
 def get_employees():
@@ -57,7 +53,6 @@ def get_employees():
     conn.close()
     return result
 
-
 def get_objects():
     conn = sqlite3.connect('data.db')
     c = conn.cursor()
@@ -66,14 +61,12 @@ def get_objects():
     conn.close()
     return result
 
-
 def add_employee(name):
     conn = sqlite3.connect('data.db')
     c = conn.cursor()
     c.execute('INSERT OR IGNORE INTO employees (name) VALUES (?)', (name,))
     conn.commit()
     conn.close()
-
 
 def add_object(name):
     conn = sqlite3.connect('data.db')
@@ -82,7 +75,6 @@ def add_object(name):
     conn.commit()
     conn.close()
 
-
 def delete_employee(name):
     conn = sqlite3.connect('data.db')
     c = conn.cursor()
@@ -90,14 +82,12 @@ def delete_employee(name):
     conn.commit()
     conn.close()
 
-
 def delete_object(name):
     conn = sqlite3.connect('data.db')
     c = conn.cursor()
     c.execute('DELETE FROM objects WHERE name = ?', (name,))
     conn.commit()
     conn.close()
-
 
 def add_record(employee, object_name, date_str, task):
     conn = sqlite3.connect('data.db')
@@ -110,7 +100,6 @@ def add_record(employee, object_name, date_str, task):
     conn.close()
     return f"✅ Сохранено: {employee} → {object_name}, {date_str} — {task}"
 
-
 def get_records_by_date(date_str):
     conn = sqlite3.connect('data.db')
     c = conn.cursor()
@@ -119,17 +108,14 @@ def get_records_by_date(date_str):
     conn.close()
     return result
 
-
 def get_records_by_period(start_date, end_date):
     conn = sqlite3.connect('data.db')
     c = conn.cursor()
     c.execute('SELECT date, object, employee, task, created_at FROM records')
     rows = c.fetchall()
     conn.close()
-
     start = datetime.strptime(start_date, '%d.%m')
     end = datetime.strptime(end_date, '%d.%m')
-
     result = []
     for row in rows:
         try:
@@ -155,10 +141,8 @@ def get_records_by_period(start_date, end_date):
                     })
             except:
                 pass
-
     result.sort(key=lambda x: (datetime.strptime(x['date'], '%d.%m'), x.get('created_at', '')))
     return result
-
 
 def get_stats_by_period(start_date, end_date):
     records = get_records_by_period(start_date, end_date)
@@ -177,7 +161,6 @@ def get_stats_by_period(start_date, end_date):
                 stats[emp][obj] = 1
     return stats
 
-
 def get_all_records():
     conn = sqlite3.connect('data.db')
     c = conn.cursor()
@@ -186,16 +169,13 @@ def get_all_records():
     conn.close()
     return result
 
-
 def get_all_records_with_ids():
     conn = sqlite3.connect('data.db')
     c = conn.cursor()
     c.execute('SELECT id, date, object, employee, task FROM records ORDER BY date, created_at')
-    result = [{'id': row[0], 'date': row[1], 'object': row[2], 'employee': row[3], 'task': row[4] or '—'} for row in
-              c.fetchall()]
+    result = [{'id': row[0], 'date': row[1], 'object': row[2], 'employee': row[3], 'task': row[4] or '—'} for row in c.fetchall()]
     conn.close()
     return result
-
 
 def delete_last_record():
     conn = sqlite3.connect('data.db')
@@ -206,7 +186,6 @@ def delete_last_record():
     conn.close()
     return deleted
 
-
 def delete_record_by_id(record_id):
     conn = sqlite3.connect('data.db')
     c = conn.cursor()
@@ -215,7 +194,6 @@ def delete_record_by_id(record_id):
     conn.commit()
     conn.close()
     return deleted
-
 
 # === ФУНКЦИИ ЭКСПОРТА ===
 def generate_detailed_excel(records, start_date, end_date):
@@ -249,7 +227,6 @@ def generate_detailed_excel(records, start_date, end_date):
     filename = f"Детальный_{start_date}-{end_date}.xlsx"
     wb.save(filename)
     return filename
-
 
 def generate_summary_excel(records, start_date, end_date):
     wb = Workbook()
@@ -287,23 +264,10 @@ def generate_summary_excel(records, start_date, end_date):
     wb.save(filename)
     return filename
 
-
-def generate_csv(records):
-    output = StringIO()
-    writer = csv.writer(output, delimiter=';')
-    writer.writerow(['Дата', 'Объект', 'Сотрудник', 'Что делали'])
-    for record in records:
-        writer.writerow([record['date'], record['object'], record['employee'], record['task']])
-    csv_data = output.getvalue()
-    return '\uFEFF' + csv_data
-
-
-# === ФУНКЦИИ ФИЛЬТРАЦИИ ===
 def filter_records_by_employees(records, selected_employees):
     if not selected_employees or 'Все' in selected_employees:
         return records
     return [r for r in records if r['employee'] in selected_employees]
-
 
 # === ГЛАВНОЕ МЕНЮ ===
 def get_main_menu():
@@ -316,14 +280,12 @@ def get_main_menu():
     markup.add('❌ Удалить запись')
     return markup
 
-
 # === ВСЕ ОБРАБОТЧИКИ ===
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
     bot.reply_to(message,
                  "👋 Привет! Я бот для учёта рабочего времени.\n\nНажмите '📋 Добавить запись', чтобы отметить день.",
                  reply_markup=get_main_menu())
-
 
 @bot.message_handler(func=lambda message: message.text == '📋 Добавить запись')
 def start_add_record(message):
@@ -335,7 +297,6 @@ def start_add_record(message):
     markup.add('❌ Отмена')
     msg = bot.reply_to(message, "Выберите сотрудника:", reply_markup=markup)
     bot.register_next_step_handler(msg, process_employee)
-
 
 def process_employee(message):
     if message.text == '❌ Отмена':
@@ -358,7 +319,6 @@ def process_employee(message):
     msg = bot.reply_to(message, f"Выбран: {employee}\nВыберите объект:", reply_markup=markup)
     bot.register_next_step_handler(msg, process_object, employee)
 
-
 def process_new_employee(message):
     employee = message.text.strip()
     add_employee(employee)
@@ -371,7 +331,6 @@ def process_new_employee(message):
     markup.add('❌ Отмена')
     msg = bot.reply_to(message, f"Выбран: {employee}\nВыберите объект:", reply_markup=markup)
     bot.register_next_step_handler(msg, process_object, employee)
-
 
 def process_object(message, employee):
     if message.text == '❌ Отмена':
@@ -391,7 +350,6 @@ def process_object(message, employee):
     msg = bot.reply_to(message, f"{employee} → {object_name}\nВведите дату (ДД.ММ):", reply_markup=markup)
     bot.register_next_step_handler(msg, process_date, employee, object_name)
 
-
 def process_new_object(message, employee):
     object_name = message.text.strip()
     add_object(object_name)
@@ -401,7 +359,6 @@ def process_new_object(message, employee):
     markup.add('❌ Отмена')
     msg = bot.reply_to(message, f"{employee} → {object_name}\nВведите дату (ДД.ММ):", reply_markup=markup)
     bot.register_next_step_handler(msg, process_date, employee, object_name)
-
 
 def process_date(message, employee, object_name):
     if message.text == '❌ Отмена':
@@ -433,7 +390,6 @@ def process_date(message, employee, object_name):
     msg = bot.reply_to(message, "Что делали? (кратко):")
     bot.register_next_step_handler(msg, process_task, employee, object_name, date_str)
 
-
 def process_duplicate(message, employee, object_name, date_str):
     if message.text == '❌ Отмена':
         bot.reply_to(message, "❌ Отменено.", reply_markup=get_main_menu())
@@ -452,18 +408,15 @@ def process_duplicate(message, employee, object_name, date_str):
     else:
         bot.reply_to(message, "❌ Неверный выбор.")
 
-
 def process_task(message, employee, object_name, date_str):
     task = message.text.strip() or '—'
     result = add_record(employee, object_name, date_str, task)
     bot.reply_to(message, result, reply_markup=get_main_menu())
 
-
 @bot.message_handler(func=lambda message: message.text == '📊 Отчёт')
 def report_custom(message):
     msg = bot.reply_to(message, "Введите период (ДД.ММ-ДД.ММ):")
     bot.register_next_step_handler(msg, process_report_period)
-
 
 def process_report_period(message, start_date=None, end_date=None):
     try:
@@ -479,7 +432,6 @@ def process_report_period(message, start_date=None, end_date=None):
     except Exception as e:
         bot.reply_to(message, f"❌ Ошибка: {e}\nИспользуйте ДД.ММ-ДД.ММ", reply_markup=get_main_menu())
 
-
 def ask_employees_for_report(message, start_date, end_date):
     employees = get_employees()
     markup = telebot.types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
@@ -493,7 +445,6 @@ def ask_employees_for_report(message, start_date, end_date):
         reply_markup=markup
     )
     bot.register_next_step_handler(msg, process_employee_selection, start_date, end_date, [])
-
 
 def process_employee_selection(message, start_date, end_date, selected_employees):
     if message.text == '❌ Отмена':
@@ -534,7 +485,6 @@ def process_employee_selection(message, start_date, end_date, selected_employees
     else:
         bot.reply_to(message, "❌ Неверный выбор. Попробуйте снова.")
 
-
 def generate_and_send_report(message, start_date, end_date, selected_employees):
     try:
         all_records = get_records_by_period(start_date, end_date)
@@ -560,7 +510,6 @@ def generate_and_send_report(message, start_date, end_date, selected_employees):
     except Exception as e:
         bot.reply_to(message, f"❌ Ошибка: {e}", reply_markup=get_main_menu())
 
-
 @bot.message_handler(func=lambda message: message.text == '📅 Весь период')
 def report_all(message):
     records = get_all_records()
@@ -572,7 +521,6 @@ def report_all(message):
     end_date = dates[-1]
     process_report_period(message, start_date, end_date)
 
-
 @bot.message_handler(func=lambda message: message.text == '📅 Неделя')
 def report_week(message):
     today = datetime.now()
@@ -580,7 +528,6 @@ def report_week(message):
     start_date = week_ago.strftime('%d.%m')
     end_date = today.strftime('%d.%m')
     process_report_period(message, start_date, end_date)
-
 
 @bot.message_handler(func=lambda message: message.text == '📅 Месяц')
 def report_month(message):
@@ -590,7 +537,6 @@ def report_month(message):
     end_date = today.strftime('%d.%m')
     process_report_period(message, start_date, end_date)
 
-
 @bot.message_handler(func=lambda message: message.text == '👤 Сотрудники')
 def employees_menu(message):
     markup = telebot.types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
@@ -598,24 +544,20 @@ def employees_menu(message):
     markup.add('❌ Удалить сотрудника', '🔙 Назад')
     bot.reply_to(message, "👤 Сотрудники:", reply_markup=markup)
 
-
 @bot.message_handler(func=lambda message: message.text == '📋 Список сотрудников')
 def list_employees(message):
     employees = get_employees()
     bot.reply_to(message, "📋 Сотрудники:\n" + "\n".join(f"• {e}" for e in employees))
-
 
 @bot.message_handler(func=lambda message: message.text == '➕ Добавить сотрудника')
 def add_new_employee(message):
     msg = bot.reply_to(message, "Введите имя:")
     bot.register_next_step_handler(msg, process_new_employee_from_menu)
 
-
 def process_new_employee_from_menu(message):
     name = message.text.strip()
     add_employee(name)
     bot.reply_to(message, f"✅ {name} добавлен!", reply_markup=get_main_menu())
-
 
 @bot.message_handler(func=lambda message: message.text == '❌ Удалить сотрудника')
 def delete_employee_menu(message):
@@ -627,14 +569,12 @@ def delete_employee_menu(message):
     msg = bot.reply_to(message, "Выберите сотрудника:", reply_markup=markup)
     bot.register_next_step_handler(msg, process_delete_employee)
 
-
 def process_delete_employee(message):
     if message.text == '❌ Отмена':
         bot.reply_to(message, "❌ Отменено.", reply_markup=get_main_menu())
         return
     delete_employee(message.text)
     bot.reply_to(message, f"✅ {message.text} удалён.", reply_markup=get_main_menu())
-
 
 @bot.message_handler(func=lambda message: message.text == '🏗 Объекты')
 def objects_menu(message):
@@ -643,24 +583,20 @@ def objects_menu(message):
     markup.add('❌ Удалить объект', '🔙 Назад')
     bot.reply_to(message, "🏗 Объекты:", reply_markup=markup)
 
-
 @bot.message_handler(func=lambda message: message.text == '📋 Список объектов')
 def list_objects(message):
     objects = get_objects()
     bot.reply_to(message, "📋 Объекты:\n" + "\n".join(f"• {o}" for o in objects))
-
 
 @bot.message_handler(func=lambda message: message.text == '➕ Добавить объект')
 def add_new_object(message):
     msg = bot.reply_to(message, "Введите название:")
     bot.register_next_step_handler(msg, process_new_object_from_menu)
 
-
 def process_new_object_from_menu(message):
     name = message.text.strip()
     add_object(name)
     bot.reply_to(message, f"✅ {name} добавлен!", reply_markup=get_main_menu())
-
 
 @bot.message_handler(func=lambda message: message.text == '❌ Удалить объект')
 def delete_object_menu(message):
@@ -672,14 +608,12 @@ def delete_object_menu(message):
     msg = bot.reply_to(message, "Выберите объект:", reply_markup=markup)
     bot.register_next_step_handler(msg, process_delete_object)
 
-
 def process_delete_object(message):
     if message.text == '❌ Отмена':
         bot.reply_to(message, "❌ Отменено.", reply_markup=get_main_menu())
         return
     delete_object(message.text)
     bot.reply_to(message, f"✅ {message.text} удалён.", reply_markup=get_main_menu())
-
 
 @bot.message_handler(func=lambda message: message.text == '📋 Повторить сегодня')
 def copy_yesterday(message):
@@ -694,14 +628,12 @@ def copy_yesterday(message):
         success.append(add_record(r['employee'], r['object'], today, r['task']))
     bot.reply_to(message, "\n".join(success), reply_markup=get_main_menu())
 
-
 @bot.message_handler(func=lambda message: message.text == '↩️ Отменить')
 def undo_last(message):
     if delete_last_record():
         bot.reply_to(message, "↩️ Последняя запись удалена.", reply_markup=get_main_menu())
     else:
         bot.reply_to(message, "❌ Нет записей.", reply_markup=get_main_menu())
-
 
 @bot.message_handler(func=lambda message: message.text == '❌ Удалить запись')
 def delete_record_menu(message):
@@ -716,7 +648,6 @@ def delete_record_menu(message):
     msg = bot.reply_to(message, "Выберите запись:", reply_markup=markup)
     bot.register_next_step_handler(msg, process_confirm_delete, records)
 
-
 def process_confirm_delete(message, records):
     if message.text == '❌ Отмена':
         bot.reply_to(message, "❌ Отменено.", reply_markup=get_main_menu())
@@ -729,21 +660,16 @@ def process_confirm_delete(message, records):
                 return
     bot.reply_to(message, "❌ Не найдено.", reply_markup=get_main_menu())
 
-
 @bot.message_handler(func=lambda message: message.text == '🔙 Назад')
 def back_to_main(message):
     bot.reply_to(message, "Главное меню:", reply_markup=get_main_menu())
 
-
-# === ПОЛЛИНГ ДЛЯ RENDER ===
 @app.route('/')
 def index():
     return 'Бот работает!', 200
 
-
 # === ЗАПУСК БОТА ===
 if __name__ == '__main__':
-    # На Render не нужен вебхук — используем polling
     bot.remove_webhook()
     print("✅ Бот запущен через polling!")
     bot.infinity_polling()
