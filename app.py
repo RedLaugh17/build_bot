@@ -658,6 +658,17 @@ def process_confirm_delete(message, records):
 @bot.message_handler(func=lambda message: message.text == '🔙 Назад')
 def back_to_main(message):
     bot.reply_to(message, "Главное меню:", reply_markup=get_main_menu())
+    
+@bot.message_handler(commands=['backup'])
+def backup_db(message):
+    if str(message.chat.id) != ADMIN_ID:
+        bot.reply_to(message, "❌ У вас нет доступа к этой команде.")
+        return
+    try:
+        with open('data.db', 'rb') as f:
+            bot.send_document(message.chat.id, f, caption="📦 Резервная копия базы данных")
+    except Exception as e:
+        bot.reply_to(message, f"❌ Ошибка: {e}")
 
 # ========== FLASK ==========
 @app.route('/')
