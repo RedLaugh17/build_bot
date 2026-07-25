@@ -672,4 +672,9 @@ def index():
 if __name__ == '__main__':
     bot.remove_webhook()
     print("✅ Бот запущен через polling!")
+    try:
+        bot.send_message(ADMIN_ID, "✅ Бот успешно запущен на Render!")
+        print("✅ Тестовое сообщение отправлено!")
+    except Exception as e:
+        print(f"❌ Ошибка при отправке тестового сообщения: {e}")
     bot.infinity_polling()
